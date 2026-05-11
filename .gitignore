@@ -1,0 +1,30 @@
+# Generated data — reproducible from src/ + source URLs
+# Ignore the heavy artifacts but track the directory skeleton
+data/pdfs/
+data/parsed/
+data/api_cache/
+data/db/
+# Keep .gitkeep placeholders so empty dirs exist after a fresh clone
+!data/pdfs/.gitkeep
+!data/parsed/.gitkeep
+!data/api_cache/.gitkeep
+!data/db/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Snapshots updated by tests
+tests/**/__snapshots__/
+
+# OS
+.DS_Store
+Thumbs.db
