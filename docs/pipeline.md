@@ -52,10 +52,12 @@ python -c "import sqlite3; from pathlib import Path; \
   con.close(); print('DB ready')"
 ```
 
-If you have an existing DB from an older schema, run the migration:
+If you have an existing DB from an older schema, run the migrations
+(in order, they're idempotent):
 
 ```bash
 python -m src.db.migrations.schema_002_vouliwatch_parity
+python -m src.db.migrations.schema_003_declarant_role
 ```
 
 ---
@@ -117,16 +119,22 @@ done
 ```
 
 What the parser does:
-- For each page table, identifies the section by column count + Greek title
-  keyword (rows 2–4 of every table contain the section title).
+- Reads page 1 to capture the declaration serial, declarant identity, the
+  **ΙΔΙΟΤΗΤΑ** (legal capacity — MP / minister / spouse), the spouse's
+  identity, and the obligation period.
+- For each subsequent page, identifies the section by column count + Greek
+  title keyword (rows 2–4 of every table contain the section title).
 - Extracts every column as either a number, date, year, or text.
 - If Tesseract is available, attempts CMap reconstruction so Greek text is
   decoded to Unicode; otherwise text stays as garbled bytes but numeric
-  data is always clean.
+  data is always clean. Note: the page-1 identity fields come through as
+  proper Unicode even without Tesseract (the form uses a different font
+  for those cells than for the data tables), so `declarant_role`,
+  `spouse_surname` etc. are reliably populated regardless.
 - Writes `ParsedDeclaration` JSON (income, vehicles, deposits, real estate,
   business shares, loans, securities, safe deposit boxes, real estate rights).
 
-Parser version is stamped into each JSON (`PARSER_VERSION = "0.1.2"`). Bumping
+Parser version is stamped into each JSON (`PARSER_VERSION = "0.1.3"`). Bumping
 the version on a re-parse produces a new declaration row in the DB without
 overwriting the old one.
 

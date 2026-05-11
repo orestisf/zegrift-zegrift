@@ -35,7 +35,7 @@ from src.parse.templates.decl_2024 import (
 )
 from src.parse.font_cmap import build_cmap, decode_text, TesseractUnavailable
 
-PARSER_VERSION = "0.1.2"
+PARSER_VERSION = "0.1.3"
 
 # Greek decimal notation uses comma as decimal separator
 _NUM_RE = re.compile(r"[-\d.,]+")
@@ -257,6 +257,22 @@ class ParsedDeclaration:
     parser_version: str = PARSER_VERSION
     declarant_surname_raw: str = ""
     declarant_given_raw: str = ""
+    declarant_patronymic_raw: str = ""
+    # Capacity under which the declaration is filed (from page-1 ΙΔΙΟΤΗΤΑ field):
+    #   "mp"       = ΒΟΥΛΕΥΤΗΣ / ΒΟΥΛΕΥΤΕΣ
+    #   "minister" = ΥΠΟΥΡΓΟΣ
+    #   "spouse"   = ΣΥΖΥΓΟΣ / ΣΣΣ ΥΠΟΧΡΕΟΥ
+    #   "other"    = anything else (e.g. ΓΓ, ΔΗΜΑΡΧΟΣ, ΠΡΟΕΔΡΟΣ ΟΡΓΑΝΙΣΜΟΥ, …)
+    #   ""         = could not classify (cmap missing or unrecognised keyword)
+    declarant_role: str = ""
+    declarant_role_raw: str = ""        # full Greek text (decoded if cmap available)
+    # Other half of the household (the "spouse box" on page 1)
+    spouse_surname_raw: str = ""
+    spouse_given_raw: str = ""
+    spouse_patronymic_raw: str = ""
+    # Obligation window printed on page 1 alongside the role
+    obligation_period_from: str = ""    # ISO-ish (dd/mm/yyyy as printed)
+    obligation_period_to: str = ""
     income: list[IncomeRow] = field(default_factory=list)
     vehicles: list[VehicleRow] = field(default_factory=list)
     deposits: list[DepositRow] = field(default_factory=list)
@@ -281,35 +297,137 @@ class ParsedDeclaration:
 
 # ─── section parsers ──────────────────────────────────────────────────────────
 
-def _parse_header(table: list[list], page, result: ParsedDeclaration) -> None:
-    """Extract declaration serial, MP name, submission date from page 1."""
-    # Row 0 always has the serial in column 3: e.g. "Σ2298-..."
-    if table and table[0]:
-        serial_raw = _cell(table[0], 3)
+# Role classification — keyword check on the *decoded* text from the
+# page-1 ΙΔΙΟΤΗΤΑ cell. Accent-stripped uppercase. Order matters: more
+# specific patterns first (a spouse PDF mentions both ΣΥΖΥΓΟΣ and ΥΠΟΧΡΕΟΥ
+# while an MP PDF only ever mentions ΒΟΥΛΕΥΤ…).
+_ROLE_KEYWORDS: list[tuple[str, str]] = [
+    ("ΣΥΖΥΓ",    "spouse"),     # ΣΥΖΥΓΟΣ, ΣΥΖΥΓΟΥ, etc.
+    ("ΣΣΣ",      "spouse"),     # ΣΣΣ ΥΠΟΧΡΕΟΥ (cohabitation partner)
+    ("ΒΟΥΛΕΥΤ",  "mp"),
+    ("ΥΠΟΥΡΓ",   "minister"),
+]
+
+
+def _classify_role(decoded_text: str) -> str:
+    """Map a (decoded) ΙΔΙΟΤΗΤΑ cell to a normalised role enum.
+
+    Returns "" when the text is empty or doesn't match any known keyword
+    (typically: cmap wasn't available, so decoded == garbled bytes).
+    """
+    if not decoded_text:
+        return ""
+    norm = _strip_accents(decoded_text).upper()
+    for keyword, role in _ROLE_KEYWORDS:
+        if keyword in norm:
+            return role
+    return "other"
+
+
+def _parse_header(
+    tables: list[list[list]],
+    page,
+    result: ParsedDeclaration,
+    cmap: dict[int, str],
+) -> None:
+    """Extract page-1 identity fields.
+
+    Page 1 has *four* tables; the relevant ones are:
+      tables[0] 7-col: serial (row 0, col 3); declarant surname / given /
+                       patronymic (rows 3-5, col 2)
+      tables[1] 4-col: spouse surname / given / patronymic (rows 0-2, col 2)
+      tables[2] 4-col: ΙΔΙΟΤΗΤΑ ("capacity") text in row 2 col 0; obligation
+                       period start / end dates in row 2 cols 1 / 2
+    """
+    # --- tables[0]: declaration serial + obligor identity --------------------
+    t0 = tables[0] if tables else []
+    if t0 and t0[0]:
+        serial_raw = _cell(t0[0], 3)
         m = re.search(r"[A-Z0-9][\d\-A-Z]+", serial_raw)
         if m:
             result.declaration_serial = m.group()
 
-    # Data rows: rows 2-5 contain field-label:value pairs in cols 0 and 2
-    for row in table[2:]:
-        value = _cell(row, 2)
-        if not value:
-            continue
-        if re.search(r"\d{2}/\d{2}/\d{4}", value):
-            result.submitted_at = re.search(r"\d{2}/\d{2}/\d{4}", value).group()
-        elif not result.declarant_surname_raw:
-            result.declarant_surname_raw = value
-        elif not result.declarant_given_raw:
-            result.declarant_given_raw = value
+    # Rows 3-5 of tables[0] hold the obligor's surname / given / patronymic
+    # in column 2. Older parser versions only kept the first two and used
+    # submitted_at heuristics; we read them by row index now.
+    def _decode_cell(raw: str) -> str:
+        if not raw:
+            return ""
+        if cmap:
+            return decode_text(raw, cmap)[0] or raw
+        return raw
 
-    # Submission date may be a free-floating text element (not inside any table)
+    if len(t0) >= 4:
+        result.declarant_surname_raw = _decode_cell(_cell(t0[3], 2))
+    if len(t0) >= 5:
+        result.declarant_given_raw = _decode_cell(_cell(t0[4], 2))
+    if len(t0) >= 6:
+        result.declarant_patronymic_raw = _decode_cell(_cell(t0[5], 2))
+
+    # --- tables[1]: spouse identity -----------------------------------------
+    if len(tables) >= 2:
+        t1 = tables[1]
+        if len(t1) >= 1:
+            result.spouse_surname_raw = _decode_cell(_cell(t1[0], 2))
+        if len(t1) >= 2:
+            result.spouse_given_raw = _decode_cell(_cell(t1[1], 2))
+        if len(t1) >= 3:
+            result.spouse_patronymic_raw = _decode_cell(_cell(t1[2], 2))
+
+    # --- tables[2]: ΙΔΙΟΤΗΤΑ (role/capacity) + obligation period ------------
+    if len(tables) >= 3:
+        t2 = tables[2]
+        if len(t2) >= 3:
+            role_row = t2[2]
+            role_raw_garbled = _cell(role_row, 0)
+            role_decoded = _decode_cell(role_raw_garbled)
+            result.declarant_role_raw = role_decoded
+            result.declarant_role = _classify_role(role_decoded)
+            # cols 1/2 hold "from / to" date stamps for the obligation window
+            start = _cell(role_row, 1)
+            end = _cell(role_row, 2)
+            if re.search(r"\d{2}/\d{2}/\d{4}", start):
+                result.obligation_period_from = re.search(
+                    r"\d{2}/\d{2}/\d{4}", start
+                ).group()
+            if re.search(r"\d{2}/\d{2}/\d{4}", end):
+                result.obligation_period_to = re.search(
+                    r"\d{2}/\d{2}/\d{4}", end
+                ).group()
+
+    # --- submission date ----------------------------------------------------
+    # Sometimes it shows up inside one of the page-1 tables in a date-shaped
+    # cell; otherwise scan the free-floating page text as a fallback.
+    if not result.submitted_at:
+        for tbl in tables:
+            for row in tbl:
+                for cell in row:
+                    if not isinstance(cell, str):
+                        continue
+                    m = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", cell)
+                    if m and m.group(1) not in (
+                        result.obligation_period_from,
+                        result.obligation_period_to,
+                    ):
+                        result.submitted_at = m.group(1)
+                        break
+                if result.submitted_at:
+                    break
+            if result.submitted_at:
+                break
     if not result.submitted_at:
         raw_text = page.extract_text() or ""
         m = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", raw_text)
         if m:
             result.submitted_at = m.group(1)
 
-    result.fields_extracted += 2
+    # If we couldn't classify the role and the cmap wasn't available, flag
+    # this declaration for review — the role was simply not decodable here.
+    if not result.declarant_role and not cmap:
+        result.errors.append("declarant_role_undecoded: cmap unavailable")
+        result.needs_review = True
+
+    result.fields_extracted += 4   # serial, surname, given, role
 
 
 def _parse_income(table: list[list], cmap: dict, result: ParsedDeclaration) -> None:
@@ -720,7 +838,9 @@ def parse_pdf(
 
             try:
                 if section == HEADER:
-                    _parse_header(table, page, result)
+                    # Page 1 actually has multiple tables (identity, spouse,
+                    # role); pass the full list so we can read all three.
+                    _parse_header(tables, page, result, cmap)
                 elif section == INCOME:
                     _parse_income(table, cmap, result)
                 elif section == VEHICLES:

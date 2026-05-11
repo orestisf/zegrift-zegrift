@@ -264,15 +264,18 @@ def _upsert_vouli_declaration(con: sqlite3.Connection, mp_id: int,
     """Create or update a synthetic declaration row. Returns decl_id."""
     fiscal_data_id = fy.get("id")
     serial = f"vouliwatch:{fiscal_data_id}" if fiscal_data_id else None
+    # Vouliwatch only ever covers the MP themselves (not spouses): every
+    # synthetic declaration row gets declarant_role='mp'.
     cur = con.execute(
         """
         INSERT INTO declaration
             (mp_id, fiscal_year, declaration_serial, submitted_at,
-             parser_version, parsed_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
+             parser_version, parsed_at, declarant_role)
+        VALUES (?, ?, ?, ?, ?, datetime('now'), 'mp')
         ON CONFLICT(mp_id, fiscal_year, parser_version) DO UPDATE SET
             declaration_serial = excluded.declaration_serial,
-            parsed_at          = excluded.parsed_at
+            parsed_at          = excluded.parsed_at,
+            declarant_role     = excluded.declarant_role
         RETURNING decl_id
         """,
         (mp_id, year, serial, None, VOULIWATCH_PARSER_VERSION),

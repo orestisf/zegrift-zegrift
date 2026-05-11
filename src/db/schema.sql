@@ -32,13 +32,24 @@ CREATE TABLE IF NOT EXISTS pdf_file (
 
 -- One row per parse pass (keyed by parser_version so re-parses don't overwrite)
 CREATE TABLE IF NOT EXISTS declaration (
-    decl_id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    mp_id              INTEGER NOT NULL REFERENCES mp_index(mp_id),
-    fiscal_year        INTEGER NOT NULL,
-    declaration_serial TEXT,              -- e.g. Σ2298-6181-3803-3101-9260-7
-    submitted_at       TEXT,              -- date printed on form
-    parser_version     TEXT NOT NULL,
-    parsed_at          TEXT NOT NULL,
+    decl_id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    mp_id                  INTEGER NOT NULL REFERENCES mp_index(mp_id),
+    fiscal_year            INTEGER NOT NULL,
+    declaration_serial     TEXT,              -- e.g. Σ2298-6181-3803-3101-9260-7
+    submitted_at           TEXT,              -- date printed on form
+    parser_version         TEXT NOT NULL,
+    parsed_at              TEXT NOT NULL,
+    -- ─── Declarant identity & legal capacity (from page-1 ΙΔΙΟΤΗΤΑ) ────
+    -- The declaration is filed by the obligor themselves, who may be the MP
+    -- or the MP's spouse / cohabitation partner. mp_id always points at the
+    -- person whose name appears in the PDF filename — declarant_role tells
+    -- you whether that person is the MP or the MP's spouse.
+    declarant_role         TEXT,              -- 'mp'|'minister'|'spouse'|'other'|NULL
+    declarant_role_raw     TEXT,              -- decoded Greek role text (audit)
+    spouse_surname         TEXT,              -- the other half of the household
+    spouse_given_name      TEXT,
+    obligation_period_from TEXT,              -- dd/mm/yyyy as printed on form
+    obligation_period_to   TEXT,
     UNIQUE (mp_id, fiscal_year, parser_version)
 );
 

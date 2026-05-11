@@ -10,7 +10,7 @@ the data came from:
 
 | `parser_version` | Source | Fiscal years |
 |---|---|---|
-| `0.1.2` (current) | Parliament PDF parser | 2024 |
+| `0.1.3` (current) | Parliament PDF parser | 2024 |
 | `vouliwatch`   | Vouliwatch API ingester | 2015–2023 |
 
 The `(mp_id, fiscal_year, parser_version)` triple is unique, so the same MP
@@ -63,15 +63,46 @@ One row per parse pass / data-source-year.
 
 | Column | Type | Notes |
 |---|---|---|
-| `decl_id`            | INTEGER PK AUTOINCREMENT |
-| `mp_id`              | INTEGER FK → mp_index |
-| `fiscal_year`        | INTEGER |
-| `declaration_serial` | TEXT, nullable | PDF: `Σ2298-…`; Vouliwatch: `vouliwatch:<id>` |
-| `submitted_at`       | TEXT, nullable | Only available from PDFs |
-| `parser_version`     | TEXT | See source-merge table above |
-| `parsed_at`          | TEXT | ISO-8601 |
+| `decl_id`                | INTEGER PK AUTOINCREMENT |
+| `mp_id`                  | INTEGER FK → mp_index |
+| `fiscal_year`            | INTEGER |
+| `declaration_serial`     | TEXT, nullable | PDF: `Σ2298-…`; Vouliwatch: `vouliwatch:<id>` |
+| `submitted_at`           | TEXT, nullable | Only available from PDFs |
+| `parser_version`         | TEXT | See source-merge table above |
+| `parsed_at`              | TEXT | ISO-8601 |
+| `declarant_role`         | TEXT, nullable | `mp` \| `minister` \| `spouse` \| `other` \| NULL — see "Declarant role" below |
+| `declarant_role_raw`     | TEXT, nullable | Decoded Greek role text, kept for audit |
+| `spouse_surname`         | TEXT, nullable | The other half of the household (from the page-1 "spouse box") |
+| `spouse_given_name`      | TEXT, nullable | |
+| `obligation_period_from` | TEXT, nullable | Start of the obligation window (`dd/mm/yyyy` as printed) |
+| `obligation_period_to`   | TEXT, nullable | End — may be NULL if the obligation is still open |
 
 Unique on `(mp_id, fiscal_year, parser_version)`.
+
+##### Declarant role
+
+A single household (MP + spouse) usually produces **two** declaration PDFs:
+one filed by the MP themselves and one filed by their spouse / cohabitation
+partner — both listed under the parliament's "pothen-esches" index. The
+`mp_id` column always points at *the person whose name is in the PDF
+filename* (i.e. the obligor of that particular declaration). `declarant_role`
+tells you which of the two roles that person plays:
+
+| `declarant_role` | Page-1 ΙΔΙΟΤΗΤΑ text contains | Means |
+|---|---|---|
+| `mp`       | `ΒΟΥΛΕΥΤ…` | This declaration was filed by the MP themselves |
+| `minister` | `ΥΠΟΥΡΓ…`  | Filed by a minister (may or may not also be an MP) |
+| `spouse`   | `ΣΥΖΥΓ…` or `ΣΣΣ…` | Filed by the MP's spouse / registered cohabitation partner; the MP's name is in `spouse_surname` / `spouse_given_name` |
+| `other`    | anything else | Mayor, public-organisation president, etc. — kept for completeness |
+| `NULL`     | (could not decode page 1) | Rare; declaration is flagged `needs_review = 1` |
+
+Vouliwatch declarations are always `declarant_role = 'mp'` (the API only
+covers MPs, never spouses).
+
+Spouse linkage is symmetric: an MP's PDF carries their spouse's name in
+`spouse_surname`/`spouse_given_name`, and the spouse's PDF carries the
+MP's name in those same columns. Joining on `(surname, given_name)` after
+normalization gives you household pairs.
 
 ---
 
@@ -304,6 +335,41 @@ WHERE mp_id = 4568095
 ORDER BY fiscal_year;
 ```
 
+**MP + spouse declarations for one household (2024 PDFs):**
+
+```sql
+-- The MP's own declaration plus their spouse's separately-filed declaration
+SELECT d.decl_id, d.mp_id, mi.surname_lat, mi.given_name_lat,
+       d.declarant_role, d.spouse_surname, d.spouse_given_name
+FROM declaration d
+JOIN mp_index mi ON mi.mp_id = d.mp_id
+WHERE d.fiscal_year = 2024
+  AND d.parser_version LIKE '0.1.%'
+  AND (
+       (mi.surname_gr = 'ΚΑΣΣΕΛΑΚΗΣ')                              -- the MP himself
+    OR (d.spouse_surname = 'ΚΑΣΣΕΛΑΚΗΣ' AND d.declarant_role = 'spouse')  -- his spouse
+  );
+```
+
+**Pair every MP with their separately-filing spouse, if any:**
+
+```sql
+SELECT mp.mp_id   AS mp_decl_id,
+       mp.mp_id   AS mp_mp_id,
+       sp.mp_id   AS spouse_mp_id,
+       mp.spouse_surname AS spouse_name
+FROM declaration mp
+LEFT JOIN declaration sp
+  ON sp.fiscal_year = mp.fiscal_year
+ AND sp.declarant_role = 'spouse'
+ AND sp.spouse_surname = (
+       SELECT surname_gr FROM mp_index WHERE mp_id = mp.mp_id
+     )
+WHERE mp.declarant_role = 'mp'
+  AND mp.fiscal_year = 2024
+  AND mp.parser_version LIKE '0.1.%';
+```
+
 **Find MPs whose wealth more than doubled over the Vouliwatch window:**
 
 ```sql
@@ -332,3 +398,7 @@ Applied so far:
 - `schema_002_vouliwatch_parity.py` — added 36 columns to existing child
   tables so Vouliwatch's richer itemized records map cleanly onto the same
   schema.
+- `schema_003_declarant_role.py` — added 6 columns to `declaration` so we
+  can tell apart PDFs filed by the MP themselves vs PDFs filed by the MP's
+  spouse, and preserve the household-linking metadata (spouse name +
+  obligation period) printed on page 1.

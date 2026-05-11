@@ -5,8 +5,13 @@ two independent sources unified into one schema:
 
 | Source | Coverage | Strengths | Weaknesses |
 |---|---|---|---|
-| Hellenic Parliament PDFs | 2024 only, ~1837 MPs | Most recent year; authoritative source | Greek font without ToUnicode CMap — needs Tesseract for clean text |
-| Vouliwatch API | 2015–2023, ~437 MPs | Clean Unicode; itemized; multi-year history | One year behind; smaller member set |
+| Hellenic Parliament PDFs | 2024 only, ~1837 obligors (MPs + their spouses) | Most recent year; authoritative source; separate MP-self vs spouse declarations | Greek font without ToUnicode CMap — needs Tesseract for clean text in the data tables |
+| Vouliwatch API | 2015–2023, ~437 MPs | Clean Unicode; itemized; multi-year history | One year behind; smaller member set; MP-self only (no spouse declarations) |
+
+Each parliament-side PDF carries a `declarant_role` (`mp` / `minister` /
+`spouse` / `other`), so cross-source queries can either union the
+household ("MP + spouse together") or filter to MP-self for an
+apples-to-apples comparison with the Vouliwatch series.
 
 Both sources are mapped onto the same schema. A query like *"all properties for
 MP X across all years and sources"* is a single join.

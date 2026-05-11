@@ -44,15 +44,35 @@ def load_declaration(con: sqlite3.Connection, d: ParsedDeclaration) -> int:
         cur = con.execute(
             """
             INSERT INTO declaration
-                (mp_id, fiscal_year, declaration_serial, submitted_at, parser_version, parsed_at)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))
+                (mp_id, fiscal_year, declaration_serial, submitted_at,
+                 parser_version, parsed_at,
+                 declarant_role, declarant_role_raw,
+                 spouse_surname, spouse_given_name,
+                 obligation_period_from, obligation_period_to)
+            VALUES (?, ?, ?, ?, ?, datetime('now'),
+                    ?, ?, ?, ?, ?, ?)
             ON CONFLICT(mp_id, fiscal_year, parser_version) DO UPDATE SET
-                declaration_serial = excluded.declaration_serial,
-                submitted_at       = excluded.submitted_at,
-                parsed_at          = excluded.parsed_at
+                declaration_serial     = excluded.declaration_serial,
+                submitted_at           = excluded.submitted_at,
+                parsed_at              = excluded.parsed_at,
+                declarant_role         = excluded.declarant_role,
+                declarant_role_raw     = excluded.declarant_role_raw,
+                spouse_surname         = excluded.spouse_surname,
+                spouse_given_name      = excluded.spouse_given_name,
+                obligation_period_from = excluded.obligation_period_from,
+                obligation_period_to   = excluded.obligation_period_to
             RETURNING decl_id
             """,
-            (d.mp_id, d.fiscal_year, d.declaration_serial, d.submitted_at, d.parser_version),
+            (
+                d.mp_id, d.fiscal_year, d.declaration_serial, d.submitted_at,
+                d.parser_version,
+                d.declarant_role or None,
+                d.declarant_role_raw or None,
+                d.spouse_surname_raw or None,
+                d.spouse_given_raw or None,
+                d.obligation_period_from or None,
+                d.obligation_period_to or None,
+            ),
         )
         row = cur.fetchone()
         if row:
@@ -278,6 +298,14 @@ def _dict_to_declaration(data: dict) -> ParsedDeclaration:
         parser_version=data.get("parser_version", PARSER_VERSION),
         declarant_surname_raw=data.get("declarant_surname_raw", ""),
         declarant_given_raw=data.get("declarant_given_raw", ""),
+        declarant_patronymic_raw=data.get("declarant_patronymic_raw", ""),
+        declarant_role=data.get("declarant_role", ""),
+        declarant_role_raw=data.get("declarant_role_raw", ""),
+        spouse_surname_raw=data.get("spouse_surname_raw", ""),
+        spouse_given_raw=data.get("spouse_given_raw", ""),
+        spouse_patronymic_raw=data.get("spouse_patronymic_raw", ""),
+        obligation_period_from=data.get("obligation_period_from", ""),
+        obligation_period_to=data.get("obligation_period_to", ""),
         fields_extracted=data.get("fields_extracted", 0),
         fields_failed=data.get("fields_failed", 0),
         cmap_glyphs_mapped=data.get("cmap_glyphs_mapped", 0),
