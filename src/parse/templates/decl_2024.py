@@ -115,19 +115,26 @@ DEPOSIT_COLS: dict[str, int] = {
 }
 
 REAL_ESTATE_COLS: dict[str, int] = {
-    "index_raw": 0,           # "ΑΚΙΝΗΤΟ 1" — trailing digit used as row number
-    "owner_type_raw": 1,      # ΚΑΤΟΧΟΣ (ΥΠΟΧΡΕΟΣ / ΣΥΖΥΓΟΣ)
-    "country_raw": 3,         # ΧΩΡΑ
-    "municipality_raw": 7,    # ΔΗΜΟΣ (municipality)
-    "property_type_raw": 8,   # ΕΙΔΟΣ ΑΚΙΝΗΤΟΥ (ΜΟΝΟΚΑΤΟΙΚΙΑ, ΔΙΑΜΕΡΙΣΜΑ, etc.)
-    "total_area_m2": 10,      # ΕΠΙΦΑΝΕΙΑ ΕΔΑΦΟΥΣ ΣΕ m2 (land area; 0 for apartments)
-    "floor_num_raw": 11,      # ΟΡΟΦΟΣ ΚΤΙΣΜΑΤΟΣ
-    "covered_area_m2": 12,    # ΕΠΙΦΑΝΕΙΑ ΚΥΡΙΩΝ ΧΩΡΩΝ ΣΕ m2 (main floor area)
-    "other_area_m2": 13,      # ΕΠΙΦΑΝΕΙΑ ΒΟΗΘΗΤΙΚΩΝ ΧΩΡΩΝ ΣΕ m2
-    "build_year": 14,         # ΕΤΟΣ ΚΑΤΑΣΚΕΥΗΣ (construction year)
-    "acquisition_year": 15,   # ΕΤΟΣ ΚΤΗΣΗΣ (acquisition year)
-    # purchase_price and objective_value are in the 19-col real_estate_rights
-    # table (transactions/acquisitions), not in this 20-col description table.
+    "index_raw": 0,                # "ΑΚΙΝΗΤΟ 1" — trailing digit used as row number
+    "owner_type_raw": 1,           # ΚΑΤΟΧΟΣ (ΥΠΟΧΡΕΟΣ / ΣΥΖΥΓΟΣ)
+    "status_raw": 2,               # ΚΑΤΑΣΤΑΣΗ Ή ΜΕΤΑΒΟΛΗ (ΑΠΟΚΤΗΣΗ ΣΕ ΤΡΕΧΟΥΣΑ/ΠΡΟΗΓΟΥΜΕΝΗ ΧΡΗΣΗ)
+    "country_raw": 3,              # ΧΩΡΑ
+    "region_raw": 4,               # ΠΕΡΙΦΕΡΕΙΑ
+    "prefecture_raw": 5,           # ΝΟΜΟΣ
+    # col 6 is a spacer (None) produced by pdfplumber for this merged-header table
+    "municipality_raw": 7,         # ΔΗΜΟΣ
+    "property_type_raw": 8,        # ΕΙΔΟΣ ΑΚΙΝΗΤΟΥ (ΜΟΝΟΚΑΤΟΙΚΙΑ, ΔΙΑΜΕΡΙΣΜΑ, etc.)
+    "property_condition_raw": 9,   # ΚΑΤΑΣΤΑΣΗ ΑΚΙΝΗΤΟΥ
+    "total_area_m2": 10,           # ΕΠΙΦΑΝΕΙΑ ΕΔΑΦΟΥΣ ΣΕ m2 (land/plot area)
+    "floor_raw": 11,               # ΟΡΟΦΟΣ ΚΤΙΣΜΑΤΟΣ (ΥΠΟΓΕΙΟ, ΙΣΟΓΕΙΟ, 1ος, etc.)
+    "covered_area_m2": 12,         # ΕΠΙΦΑΝΕΙΑ ΚΥΡΙΩΝ ΧΩΡΩΝ ΣΕ m2 (main floor area)
+    "other_area_m2": 13,           # ΕΠΙΦΑΝΕΙΑ ΒΟΗΘΗΤΙΚΩΝ ΧΩΡΩΝ ΣΕ m2
+    "build_year": 14,              # ΕΤΟΣ ΚΑΤΑΣΚΕΥΗΣ
+    "acquisition_year": 15,        # ΕΤΟΣ ΚΤΗΣΗΣ
+    "transfer_year": 16,           # ΕΤΟΣ ΜΕΤΑΒΙΒΑΣΗΣ
+    "swimming_pool_m2": 17,        # ΤΕΤΡΑΓΩΝΙΚΑ ΜΕΤΡΑ ΠΙΣΙΝΑΣ
+    "energy_production_kw": 18,    # ΙΣΧΥΣ ΜΟΝΑΔΑΣ ΠΑΡΑΓΩΓΗΣ ΕΝΕΡΓΕΙΑΣ
+    # col 19 is a trailing spacer
 }
 
 BUSINESS_SHARE_COLS: dict[str, int] = {
@@ -193,12 +200,25 @@ SAFE_DEPOSIT_COLS: dict[str, int] = {
 
 # 19-col real estate rights/acquisitions table ("Ακίνητα και εμπράγματα δικαιώματα...")
 REAL_ESTATE_RIGHTS_COLS: dict[str, int] = {
-    "index_raw": 0,             # "ΑΚΙΝΗΤΟ 1" — trailing digit used as row number
-    "rights_type_raw": 4,       # ΕΜΠΡΑΓΜΑΤΑ ΔΙΚΑΙΩΜΑΤΑ (e.g. "ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", "ΣΥΓΚΥΡΙΟΤΗΤΑ 33.33 %")
-    "acquisition_method_raw": 5, # ΤΡΟΠΟΙ ΚΤΗΣΗΣ (ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.)
-    "price_paid": 7,            # ΣΥΝΟΛΙΚΟ ΚΑΤΑΒΛΗΘΕΝ ΤΙΜΗΜΑ ΣΕ ΕΥΡΩ (€)
-    "objective_value": 10,      # ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
-    "received_price": 13,       # ΕΙΣΠΡΑΧΘΕΝ ΤΙΜΗΜΑ ΣΕ ΕΥΡΩ (€)
+    "index_raw": 0,                     # "ΑΚΙΝΗΤΟ 1" — trailing digit used as row number
+    "heir_name_raw": 1,                 # ΕΠΩΝΥΜΟ/ΟΝΟΜΑ ΚΛΗΡΟΝΟΜΟΥΜΕΝΟΥ (combined in PDF)
+    "heir_capacity_raw": 2,             # ΙΔΙΟΤΗΤΑ ΚΛΗΡΟΝΟΜΟΥ
+    "heir_acquisition_method_raw": 3,   # ΤΡΟΠΟΣ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ ΚΛΗΡΟΝΟΜΟΥ
+    "rights_type_raw": 4,               # ΕΜΠΡΑΓΜΑΤΑ ΔΙΚΑΙΩΜΑΤΑ ("ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", etc.)
+    "acquisition_method_raw": 5,        # ΤΡΟΠΟΙ ΚΤΗΣΗΣ (ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.)
+    # col 6 is a spacer (None)
+    "price_paid": 7,                    # ΣΥΝΟΛΙΚΟ ΚΑΤΑΒΛΗΘΕΝ ΤΙΜΗΜΑ ΣΕ ΕΥΡΩ (€)
+    "money_sources_raw": 8,             # ΠΗΓΕΣ ΠΡΟΕΛΕΥΣΗΣ ΧΡΗΜΑΤΩΝ
+    "acquisition_contract_number": 9,   # ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    "objective_value": 10,              # ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    # col 11 is a spacer (None)
+    "currency": 12,                     # ΝΟΜΙΣΜΑ
+    "received_price": 13,               # ΕΙΣΠΡΑΧΘΕΝ ΤΙΜΗΜΑ ΣΕ ΕΥΡΩ (€)
+    "disposal_contract_number": 14,     # ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    "disposal_objective_value": 15,     # ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    "kaek": 16,                         # ΚΩΔ. ΑΡ. ΕΘΝΙΚΟΥ ΚΤΗΜΑΤΟΛΟΓΙΟΥ (Κ.Α.Ε.Κ.)
+    "notes_raw": 17,                    # ΠΑΡΑΤΗΡΗΣΕΙΣ
+    # col 18 is a trailing spacer
 }
 
 # ─── row-skip rules ──────────────────────────────────────────────────────────

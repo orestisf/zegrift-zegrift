@@ -147,15 +147,25 @@ class DepositRow:
 @dataclass
 class RealEstateRow:
     row_index: int
-    property_type_raw: str = ""
-    property_type_decoded: str = ""
+    owner_type_raw: str = ""           # ΚΑΤΟΧΟΣ (ΥΠΟΧΡΕΟΣ / ΣΥΖΥΓΟΣ)
+    status_raw: str = ""               # ΚΑΤΑΣΤΑΣΗ Ή ΜΕΤΑΒΟΛΗ
+    country_raw: str = ""              # ΧΩΡΑ
+    region_raw: str = ""               # ΠΕΡΙΦΕΡΕΙΑ
+    prefecture_raw: str = ""           # ΝΟΜΟΣ
     municipality_raw: str = ""
     municipality_decoded: str = ""
-    total_area_m2: float | None = None
-    covered_area_m2: float | None = None
-    other_area_m2: float | None = None
-    acquisition_year: int | None = None
+    property_type_raw: str = ""
+    property_type_decoded: str = ""
+    property_condition_raw: str = ""   # ΚΑΤΑΣΤΑΣΗ ΑΚΙΝΗΤΟΥ
+    floor_raw: str = ""                # ΟΡΟΦΟΣ ΚΤΙΣΜΑΤΟΣ
+    total_area_m2: float | None = None     # ΕΠΙΦΑΝΕΙΑ ΕΔΑΦΟΥΣ (land/plot area)
+    covered_area_m2: float | None = None   # ΕΠΙΦΑΝΕΙΑ ΚΥΡΙΩΝ ΧΩΡΩΝ (main floor area)
+    other_area_m2: float | None = None     # ΕΠΙΦΑΝΕΙΑ ΒΟΗΘΗΤΙΚΩΝ ΧΩΡΩΝ
     build_year: int | None = None
+    acquisition_year: int | None = None
+    transfer_year: int | None = None       # ΕΤΟΣ ΜΕΤΑΒΙΒΑΣΗΣ
+    swimming_pool_m2: float | None = None  # ΤΕΤΡΑΓΩΝΙΚΑ ΜΕΤΡΑ ΠΙΣΙΝΑΣ
+    energy_production_kw: float | None = None  # ΙΣΧΥΣ ΜΟΝΑΔΑΣ ΠΑΡΑΓΩΓΗΣ ΕΝΕΡΓΕΙΑΣ
     purchase_price: float | None = None
     objective_value: float | None = None
     extraction_method: str = "positional"
@@ -237,13 +247,23 @@ class SafeDepositBoxRow:
 @dataclass
 class RealEstateRightsRow:
     row_index: int
-    rights_type_raw: str = ""      # e.g. "ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", "ΣΥΓΚΥΡΙΟΤΗΤΑ 33.33 %"
-    rights_pct: float | None = None  # numeric % extracted from rights_type_raw
-    acquisition_method_raw: str = ""  # ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.
+    heir_name_raw: str = ""                # ΕΠΩΝΥΜΟ/ΟΝΟΜΑ ΚΛΗΡΟΝΟΜΟΥΜΕΝΟΥ
+    heir_capacity_raw: str = ""            # ΙΔΙΟΤΗΤΑ ΚΛΗΡΟΝΟΜΟΥ
+    heir_acquisition_method_raw: str = ""  # ΤΡΟΠΟΣ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ ΚΛΗΡΟΝΟΜΟΥ
+    rights_type_raw: str = ""              # ΕΜΠΡΑΓΜΑΤΑ ΔΙΚΑΙΩΜΑΤΑ ("ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", etc.)
+    rights_pct: float | None = None        # numeric % extracted from rights_type_raw
+    acquisition_method_raw: str = ""       # ΤΡΟΠΟΙ ΚΤΗΣΗΣ (ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.)
     acquisition_method_decoded: str = ""
-    price_paid: float | None = None
-    objective_value: float | None = None
-    received_price: float | None = None
+    price_paid: float | None = None        # ΣΥΝΟΛΙΚΟ ΚΑΤΑΒΛΗΘΕΝ ΤΙΜΗΜΑ
+    money_sources_raw: str = ""            # ΠΗΓΕΣ ΠΡΟΕΛΕΥΣΗΣ ΧΡΗΜΑΤΩΝ
+    acquisition_contract_number: str = ""  # ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    objective_value: float | None = None   # ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    currency: str = ""                     # ΝΟΜΙΣΜΑ
+    received_price: float | None = None    # ΕΙΣΠΡΑΧΘΕΝ ΤΙΜΗΜΑ
+    disposal_contract_number: str = ""     # ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    disposal_objective_value: float | None = None  # ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    kaek: str = ""                         # ΚΩΔ. ΑΡ. ΕΘΝΙΚΟΥ ΚΤΗΜΑΤΟΛΟΓΙΟΥ (Κ.Α.Ε.Κ.)
+    notes_raw: str = ""                    # ΠΑΡΑΤΗΡΗΣΕΙΣ
     extraction_method: str = "positional"
     confidence: float = 0.0
 
@@ -529,19 +549,27 @@ def _parse_real_estate(table: list[list], cmap: dict, result: ParsedDeclaration)
         prop_raw = _cell(row, c["property_type_raw"])
         _, prop_dec, p_conf = _decode(prop_raw, cmap)
         conf = max(m_conf, p_conf)
-        total_area = _parse_greek_number(_cell(row, c["total_area_m2"]))
-        covered_area = _parse_greek_number(_cell(row, c["covered_area_m2"]))
         r = RealEstateRow(
             row_index=row_num,
-            property_type_raw=prop_raw,
-            property_type_decoded=prop_dec,
+            owner_type_raw=_cell(row, c["owner_type_raw"]),
+            status_raw=_cell(row, c["status_raw"]),
+            country_raw=_cell(row, c["country_raw"]),
+            region_raw=_cell(row, c["region_raw"]),
+            prefecture_raw=_cell(row, c["prefecture_raw"]),
             municipality_raw=mun_raw,
             municipality_decoded=mun_dec,
-            total_area_m2=total_area,
-            covered_area_m2=covered_area,
+            property_type_raw=prop_raw,
+            property_type_decoded=prop_dec,
+            property_condition_raw=_cell(row, c["property_condition_raw"]),
+            floor_raw=_cell(row, c["floor_raw"]),
+            total_area_m2=_parse_greek_number(_cell(row, c["total_area_m2"])),
+            covered_area_m2=_parse_greek_number(_cell(row, c["covered_area_m2"])),
             other_area_m2=_parse_greek_number(_cell(row, c["other_area_m2"])),
-            acquisition_year=_parse_year(_cell(row, c["acquisition_year"])),
             build_year=_parse_year(_cell(row, c["build_year"])),
+            acquisition_year=_parse_year(_cell(row, c["acquisition_year"])),
+            transfer_year=_parse_year(_cell(row, c["transfer_year"])),
+            swimming_pool_m2=_parse_greek_number(_cell(row, c["swimming_pool_m2"])),
+            energy_production_kw=_parse_greek_number(_cell(row, c["energy_production_kw"])),
             purchase_price=None,    # not available in 20-col description table
             objective_value=None,
             extraction_method="cmap_decoded" if conf > 0.5 else "positional",
@@ -729,13 +757,23 @@ def _parse_real_estate_rights(table: list[list], cmap: dict, result: ParsedDecla
                 pass
         r = RealEstateRightsRow(
             row_index=row_num,
+            heir_name_raw=_cell(row, c["heir_name_raw"]),
+            heir_capacity_raw=_cell(row, c["heir_capacity_raw"]),
+            heir_acquisition_method_raw=_cell(row, c["heir_acquisition_method_raw"]),
             rights_type_raw=rights_raw,
             rights_pct=rights_pct,
             acquisition_method_raw=acq_raw,
             acquisition_method_decoded=acq_dec,
             price_paid=_parse_greek_number(_cell(row, c["price_paid"])),
+            money_sources_raw=_cell(row, c["money_sources_raw"]),
+            acquisition_contract_number=_cell(row, c["acquisition_contract_number"]),
             objective_value=_parse_greek_number(_cell(row, c["objective_value"])),
+            currency=_cell(row, c["currency"]),
             received_price=_parse_greek_number(_cell(row, c["received_price"])),
+            disposal_contract_number=_cell(row, c["disposal_contract_number"]),
+            disposal_objective_value=_parse_greek_number(_cell(row, c["disposal_objective_value"])),
+            kaek=_cell(row, c["kaek"]),
+            notes_raw=_cell(row, c["notes_raw"]),
             extraction_method="cmap_decoded" if conf > 0.5 else "positional",
             confidence=conf,
         )

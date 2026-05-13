@@ -59,18 +59,28 @@ CREATE TABLE IF NOT EXISTS real_estate (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     decl_id             INTEGER NOT NULL REFERENCES declaration(decl_id),
     row_index           INTEGER NOT NULL,
-    kind                TEXT,             -- e.g. "διαμέρισμα", "αγροτεμάχιο"
+    kind                TEXT,             -- ΕΙΔΟΣ ΑΚΙΝΗΤΟΥ (e.g. ΔΙΑΜΕΡΙΣΜΑ, ΑΓΡΟΤΕΜΑΧΙΟ)
+    owner_type          TEXT,             -- ΚΑΤΟΧΟΣ (ΥΠΟΧΡΕΟΣ / ΣΥΖΥΓΟΣ)
+    status              TEXT,             -- ΚΑΤΑΣΤΑΣΗ Ή ΜΕΤΑΒΟΛΗ (ΑΠΟΚΤΗΣΗ ΣΕ ΤΡΕΧΟΥΣΑ/ΠΡΟΗΓΟΥΜΕΝΗ ΧΡΗΣΗ)
     share_pct           REAL,
-    area_m2             REAL,             -- covered/main area
-    landsize_m2         REAL,             -- plot/land area
-    location_raw        TEXT,             -- raw bytes from pdfplumber (may be garbled)
-    location_decoded    TEXT,             -- after CMap/OCR decode
-    country             TEXT,
-    acquisition_year    INTEGER,
-    value_eur           REAL,             -- declared/objective value
+    area_m2             REAL,             -- ΕΠΙΦΑΝΕΙΑ ΚΥΡΙΩΝ ΧΩΡΩΝ (main/covered floor area)
+    other_area_m2       REAL,             -- ΕΠΙΦΑΝΕΙΑ ΒΟΗΘΗΤΙΚΩΝ ΧΩΡΩΝ (auxiliary area)
+    landsize_m2         REAL,             -- ΕΠΙΦΑΝΕΙΑ ΕΔΑΦΟΥΣ (plot/land area)
+    location_raw        TEXT,             -- ΔΗΜΟΣ raw (may be garbled)
+    location_decoded    TEXT,             -- ΔΗΜΟΣ after CMap/OCR decode
+    country             TEXT,             -- ΧΩΡΑ
+    region              TEXT,             -- ΠΕΡΙΦΕΡΕΙΑ
+    prefecture          TEXT,             -- ΝΟΜΟΣ
+    floor               TEXT,             -- ΟΡΟΦΟΣ ΚΤΙΣΜΑΤΟΣ (ΥΠΟΓΕΙΟ, ΙΣΟΓΕΙΟ, etc.)
+    property_condition  TEXT,             -- ΚΑΤΑΣΤΑΣΗ ΑΚΙΝΗΤΟΥ
+    build_year          INTEGER,          -- ΕΤΟΣ ΚΑΤΑΣΚΕΥΗΣ
+    acquisition_year    INTEGER,          -- ΕΤΟΣ ΚΤΗΣΗΣ
+    transfer_year       INTEGER,          -- ΕΤΟΣ ΜΕΤΑΒΙΒΑΣΗΣ
+    swimming_pool       REAL,             -- ΤΕΤΡΑΓΩΝΙΚΑ ΜΕΤΡΑ ΠΙΣΙΝΑΣ
+    energy_production_kw REAL,            -- ΙΣΧΥΣ ΜΟΝΑΔΑΣ ΠΑΡΑΓΩΓΗΣ ΕΝΕΡΓΕΙΑΣ
+    value_eur           REAL,             -- declared/objective value (from Vouliwatch)
     rights              TEXT,             -- ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ, ΣΥΓΚΥΡΙΟΤΗΤΑ, etc.
     acquisition_method  TEXT,             -- ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.
-    swimming_pool       REAL,
     currency            TEXT,
     partner             INTEGER DEFAULT 0,  -- 0=obligor, 1=spouse
     extraction_method   TEXT NOT NULL,    -- positional|cmap_decoded|region_ocr|failed|vouliwatch
@@ -146,18 +156,28 @@ CREATE TABLE IF NOT EXISTS safe_deposit_box (
 
 -- Real estate rights / acquisitions (19-col table — transactions, not descriptions)
 CREATE TABLE IF NOT EXISTS real_estate_acquisition (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    decl_id             INTEGER NOT NULL REFERENCES declaration(decl_id),
-    row_index           INTEGER NOT NULL,
-    rights_type         TEXT,             -- e.g. "ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", "ΣΥΓΚΥΡΙΟΤΗΤΑ 33.33 %"
-    rights_pct          REAL,             -- extracted numeric % from rights_type
-    acquisition_method  TEXT,             -- ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.
-    price_paid_eur      REAL,
-    objective_value_eur REAL,
-    received_price_eur  REAL,
-    partner             INTEGER DEFAULT 0,
-    extraction_method   TEXT NOT NULL,
-    confidence          REAL
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    decl_id                     INTEGER NOT NULL REFERENCES declaration(decl_id),
+    row_index                   INTEGER NOT NULL,
+    heir_name                   TEXT,             -- ΕΠΩΝΥΜΟ/ΟΝΟΜΑ ΚΛΗΡΟΝΟΜΟΥΜΕΝΟΥ
+    heir_capacity               TEXT,             -- ΙΔΙΟΤΗΤΑ ΚΛΗΡΟΝΟΜΟΥ
+    heir_acquisition_method     TEXT,             -- ΤΡΟΠΟΣ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ ΚΛΗΡΟΝΟΜΟΥ
+    rights_type                 TEXT,             -- ΕΜΠΡΑΓΜΑΤΑ ΔΙΚΑΙΩΜΑΤΑ ("ΠΛΗΡΗΣ ΚΥΡΙΟΤΗΤΑ 100 %", etc.)
+    rights_pct                  REAL,             -- extracted numeric % from rights_type
+    acquisition_method          TEXT,             -- ΤΡΟΠΟΙ ΚΤΗΣΗΣ (ΓΟΝΙΚΗ ΠΑΡΟΧΗ, ΑΓΟΡΑ, etc.)
+    price_paid_eur              REAL,             -- ΣΥΝΟΛΙΚΟ ΚΑΤΑΒΛΗΘΕΝ ΤΙΜΗΜΑ
+    money_sources               TEXT,             -- ΠΗΓΕΣ ΠΡΟΕΛΕΥΣΗΣ ΧΡΗΜΑΤΩΝ
+    acquisition_contract_number TEXT,             -- ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    objective_value_eur         REAL,             -- ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΑΠΟΚΤΗΣΗΣ
+    currency                    TEXT,             -- ΝΟΜΙΣΜΑ
+    received_price_eur          REAL,             -- ΕΙΣΠΡΑΧΘΕΝ ΤΙΜΗΜΑ
+    disposal_contract_number    TEXT,             -- ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    disposal_objective_value_eur REAL,            -- ΑΝΤΙΚΕΙΜΕΝΙΚΗ ΑΞΙΑ ΣΥΜΒΟΛΑΙΟΥ ΕΚΠΟΙΗΣΗΣ/ΜΕΤΑΒΟΛΗΣ
+    kaek                        TEXT,             -- ΚΩΔ. ΑΡ. ΕΘΝΙΚΟΥ ΚΤΗΜΑΤΟΛΟΓΙΟΥ (Κ.Α.Ε.Κ.)
+    notes                       TEXT,             -- ΠΑΡΑΤΗΡΗΣΕΙΣ
+    partner                     INTEGER DEFAULT 0,
+    extraction_method           TEXT NOT NULL,
+    confidence                  REAL
 );
 
 -- Business participations / company shares
