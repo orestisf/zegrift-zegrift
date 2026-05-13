@@ -35,7 +35,7 @@ from src.parse.templates.decl_2024 import (
 )
 from src.parse.font_cmap import build_cmap, decode_text, TesseractUnavailable
 
-PARSER_VERSION = "0.1.3"
+PARSER_VERSION = "0.1.4"
 
 # Greek decimal notation uses comma as decimal separator
 _NUM_RE = re.compile(r"[-\d.,]+")
@@ -270,9 +270,9 @@ class ParsedDeclaration:
     spouse_surname_raw: str = ""
     spouse_given_raw: str = ""
     spouse_patronymic_raw: str = ""
-    # Obligation window printed on page 1 alongside the role
-    obligation_period_from: str = ""    # ISO-ish (dd/mm/yyyy as printed)
-    obligation_period_to: str = ""
+    # Dates from the ΙΔΙΟΤΗΤΑ row on page 1
+    role_acquisition_date: str = ""     # ΗΜΕΡΟΜΗΝΙΑ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ (dd/mm/yyyy)
+    role_loss_date: str = ""            # ΗΜ. ΑΠΩΛΕΙΑΣ ΙΔΙΟΤΗΤΑΣ (dd/mm/yyyy; empty if still serving)
     income: list[IncomeRow] = field(default_factory=list)
     vehicles: list[VehicleRow] = field(default_factory=list)
     deposits: list[DepositRow] = field(default_factory=list)
@@ -383,16 +383,16 @@ def _parse_header(
             role_decoded = _decode_cell(role_raw_garbled)
             result.declarant_role_raw = role_decoded
             result.declarant_role = _classify_role(role_decoded)
-            # cols 1/2 hold "from / to" date stamps for the obligation window
-            start = _cell(role_row, 1)
-            end = _cell(role_row, 2)
-            if re.search(r"\d{2}/\d{2}/\d{4}", start):
-                result.obligation_period_from = re.search(
-                    r"\d{2}/\d{2}/\d{4}", start
+            # col 1: ΗΜΕΡΟΜΗΝΙΑ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ; col 2: ΗΜ. ΑΠΩΛΕΙΑΣ ΙΔΙΟΤΗΤΑΣ
+            acq = _cell(role_row, 1)
+            loss = _cell(role_row, 2)
+            if re.search(r"\d{2}/\d{2}/\d{4}", acq):
+                result.role_acquisition_date = re.search(
+                    r"\d{2}/\d{2}/\d{4}", acq
                 ).group()
-            if re.search(r"\d{2}/\d{2}/\d{4}", end):
-                result.obligation_period_to = re.search(
-                    r"\d{2}/\d{2}/\d{4}", end
+            if re.search(r"\d{2}/\d{2}/\d{4}", loss):
+                result.role_loss_date = re.search(
+                    r"\d{2}/\d{2}/\d{4}", loss
                 ).group()
 
     # --- submission date ----------------------------------------------------
@@ -406,8 +406,8 @@ def _parse_header(
                         continue
                     m = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", cell)
                     if m and m.group(1) not in (
-                        result.obligation_period_from,
-                        result.obligation_period_to,
+                        result.role_acquisition_date,
+                        result.role_loss_date,
                     ):
                         result.submitted_at = m.group(1)
                         break
