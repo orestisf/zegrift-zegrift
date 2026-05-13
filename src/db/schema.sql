@@ -48,8 +48,9 @@ CREATE TABLE IF NOT EXISTS declaration (
     declarant_role_raw     TEXT,              -- decoded Greek role text (audit)
     spouse_surname         TEXT,              -- the other half of the household
     spouse_given_name      TEXT,
-    obligation_period_from TEXT,              -- dd/mm/yyyy as printed on form
-    obligation_period_to   TEXT,
+    spouse_mp_id           INTEGER REFERENCES mp_index(mp_id),  -- set when spouse is also an MP
+    role_acquisition_date  TEXT,              -- ΗΜΕΡΟΜΗΝΙΑ ΑΠΟΚΤΗΣΗΣ ΙΔΙΟΤΗΤΑΣ (dd/mm/yyyy)
+    role_loss_date         TEXT,              -- ΗΜ. ΑΠΩΛΕΙΑΣ ΙΔΙΟΤΗΤΑΣ (dd/mm/yyyy; NULL if still serving)
     UNIQUE (mp_id, fiscal_year, parser_version)
 );
 
