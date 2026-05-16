@@ -3,9 +3,13 @@
 The pipeline has two parallel data sources (Parliament PDFs, Vouliwatch API)
 that merge in the unified schema, plus a linking step in between.
 
+Parliament PDFs are available for **multiple years** (currently 2022–2025,
+covering fiscal years 2021–2024).  The scraper and downloader support
+processing all years in a single run.
+
 ```
 ┌──────────────────────────┐   ┌──────────────────────────┐
-│  Parliament PDFs (2024)  │   │  Vouliwatch API (15–23)  │
+│  Parliament PDFs (22–25) │   │  Vouliwatch API (15–23)  │
 └────────────┬─────────────┘   └────────────┬─────────────┘
              │                              │
    ┌─────────▼─────────┐         ┌──────────▼──────────┐
@@ -42,6 +46,15 @@ Optional but recommended (for clean Greek text in parliament-PDF data):
   `brew install tesseract tesseract-lang` on macOS, or the official Windows
   installer + `tessdata/grc.traineddata` and `tessdata/ell.traineddata`).
 
+Required for scraping/downloading from the parliament site:
+- **Playwright** with a Chromium-based browser:
+  ```bash
+  pip install playwright
+  playwright install
+  ```
+  The scraper and downloader default to Edge (`channel="msedge"`) to bypass
+  the Akamai WAF.  Microsoft Edge is pre-installed on Windows.
+
 Initialise the SQLite database from `schema.sql`:
 
 ```bash
@@ -64,34 +77,70 @@ python -m src.db.migrations.schema_003_declarant_role
 
 ## 1. Scrape the parliament index
 
-Pulls the index page and writes one row per MP into `mp_index`.
+Pulls the index page(s) and writes one row per MP into `mp_index`.
 
 ```bash
-python -m src.ingest.scrape_index
+# Single year (default: latest available)
+python -m src.ingest.scrape_index --year 2025
+
+# All available years (2022–2025)
+python -m src.ingest.scrape_index --all-years
+
+# With archival JSON + CSV output
+python -m src.ingest.scrape_index --all-years --out-json data/archive/index --out-csv data/archive/csv
 ```
 
-Result: `mp_index` populated with ~1837 rows (mp_id, Greek + Latin names,
-PDF URL). Idempotent — re-runs upsert by mp_id.
+Result: `mp_index` populated with one row per (mp_id, year).
+Idempotent — re-runs upsert by mp_id.
+
+Note: `mp_id` is **not stable** across years — the same person gets a
+different ID each year.  Cross-year identity is resolved by name matching
+in the linking step.
+
+Note: the parliament site uses Akamai WAF which blocks `requests`.  The
+scraper uses Playwright (Edge) by default.  Use `--no-playwright` to fall
+back to `requests` (may only work on certain networks).
+
+Available years and their PDF counts:
+
+| Year label | Fiscal year | PDFs | PDF suffix |
+|---|---|---|---|
+| 2022 | 2021 | ~1,023 | `_2022.pdf` |
+| 2023 | 2022 | ~1,320 | `_2023e.pdf` |
+| 2024 | 2023 | ~1,543 | `_2024e.pdf` |
+| 2025 | 2024 | ~1,837 | `_2025e.pdf` |
 
 ---
 
 ## 2. Download all PDFs
 
 ```bash
-python -m src.ingest.download_pdfs --out-dir data/pdfs/2025
+# Single year
+python -m src.ingest.download_pdfs --year 2025
+
+# All available years
+python -m src.ingest.download_pdfs --all-years
+
+# Smoke test (first 5 PDFs from one year)
+python -m src.ingest.download_pdfs --year 2022 --limit 5
 ```
 
 Useful flags:
 - `--limit N` — fetch only the first N (smoke test)
-- `--out-dir PATH` — override the default `data/pdfs/2025`
+- `--out-dir PATH` — override the default `data/pdfs/`
+- `--no-playwright` — use `requests` instead of Playwright
+
+PDFs are stored in year-specific subdirectories: `data/pdfs/{year_label}/`.
 
 Behaviour:
+- Uses Playwright's in-page `fetch()` to bypass Akamai WAF (same session
+  cookies as the index page).
 - Skips files already on disk with matching content-length (safe to resume).
 - Throttles to ~2 req/s, exponential backoff on 429 / 5xx.
 - Records sha256 + content-length in `pdf_file`.
 
-Expected wall-clock: roughly 15–30 minutes for the full ~1837-file corpus,
-depending on parliament-site latency.
+Expected wall-clock: ~15–30 min per year for the full corpus.
+Total across all years: ~5,700 PDFs, ~1.1 GB.
 
 ---
 
@@ -293,3 +342,9 @@ the limit; if you hit one, the tenacity retry decorator will back off and
 retry up to 5 times. If it persists, the API may be rate-limiting on a
 shorter window — wait a minute and re-run; cached responses will skip
 network entirely.
+
+**`Akamai WAF blocked access`** or **`Access Denied`** on scrape/download —
+the parliament site uses Akamai CDN which fingerprints headless browsers and
+blocks `requests`.  Make sure you're using Playwright with a real browser
+channel (Edge or Chrome) — headless Chromium alone won't work.  If blocking
+persists, try from a different network or wait a few minutes.

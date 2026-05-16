@@ -3,12 +3,17 @@
 data/pdfs/
 data/parsed/
 data/api_cache/
+data/archive/
 data/db/
 # Keep .gitkeep placeholders so empty dirs exist after a fresh clone
 !data/pdfs/.gitkeep
 !data/parsed/.gitkeep
 !data/api_cache/.gitkeep
+!data/archive/.gitkeep
 !data/db/.gitkeep
+
+# Scratch / one-off scripts
+scratch/
 
 # Python
 __pycache__/

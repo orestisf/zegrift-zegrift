@@ -5,7 +5,7 @@ two independent sources unified into one schema:
 
 | Source | Coverage | Strengths | Weaknesses |
 |---|---|---|---|
-| Hellenic Parliament PDFs | 2024 only, ~1837 obligors (MPs + their spouses) | Most recent year; authoritative source; separate MP-self vs spouse declarations | Greek font without ToUnicode CMap — needs Tesseract for clean text in the data tables |
+| Hellenic Parliament PDFs | 2022–2025 (4 years) | Most recent data; authoritative source; separate MP-self vs spouse declarations | Greek font without ToUnicode CMap — needs Tesseract for clean text in the data tables |
 | Vouliwatch API | 2015–2023, ~437 MPs | Clean Unicode; itemized; multi-year history | One year behind; smaller member set; MP-self only (no spouse declarations) |
 
 Each parliament-side PDF carries a `declarant_role` (`mp` / `minister` /
@@ -40,8 +40,11 @@ python -c "import sqlite3; from pathlib import Path; \
   con.close()"
 
 # 3. Run the pipeline (see docs/pipeline.md for details)
-python -m src.ingest.scrape_index
-python -m src.ingest.download_pdfs
+# Scrape all available years (2022–2025)
+python -m src.ingest.scrape_index --all-years
+# Download all PDFs (uses Playwright to bypass Akamai WAF)
+python -m src.ingest.download_pdfs --all-years
+# Parse PDFs (example for one file)
 python -m src.parse.parse_pdf data/pdfs/2025/{file}.pdf --out data/parsed/{mp_id}.json
 python -m src.db.load --all-parsed data/parsed/
 python -m src.ingest.vouliwatch --phase identity
@@ -59,7 +62,12 @@ src/
   db/             schema.sql, load.py, migrations/
   link/           match.py
 data/
-  pdfs/2025/      downloaded declaration PDFs
+  pdfs/           downloaded declaration PDFs
+    2022/           year 2022 (fiscal 2021)
+    2023/           year 2023 (fiscal 2022)
+    2024/           year 2024 (fiscal 2023)
+    2025/           year 2025 (fiscal 2024)
+  archive/        archival index JSONs/CSVs per year
   parsed/         parsed JSON per MP
   api_cache/      cached Vouliwatch API responses
   db/zegrift.sqlite
